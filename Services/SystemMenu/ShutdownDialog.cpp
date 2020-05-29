@@ -61,18 +61,27 @@ Vector<char const*> ShutdownDialog::show()
 ShutdownDialog::ShutdownDialog()
     : Dialog(nullptr)
 {
-    Gfx::Rect rect({ 0, 0, 180, 180 + ((static_cast<int>(options.size()) - 3) * 16) });
+    Gfx::Rect rect({ 0, 0, 413, 260 + ((static_cast<int>(options.size()) - 3) * 16) });
     rect.center_within(GUI::Desktop::the().rect());
     set_rect(rect);
     set_resizable(false);
     set_title("SerenityOS");
     set_icon(Gfx::Bitmap::load_from_file("/res/icons/16x16/power.png"));
 
-    auto& main = set_main_widget<GUI::Widget>();
+    auto& container = set_main_widget<GUI::Widget>();
+    container.set_layout<GUI::VerticalBoxLayout>();
+    container.layout()->set_spacing(0);
+    container.set_fill_with_background_color(true);
+
+    auto& banner_label = container.add<GUI::Label>();
+    banner_label.set_icon(Gfx::Bitmap::load_from_file("/res/brand-banner.png"));
+    banner_label.set_size_policy(GUI::SizePolicy::Fixed, GUI::SizePolicy::Fixed);
+    banner_label.set_preferred_size(banner_label.icon()->size());
+
+    auto& main = container.add<GUI::Widget>();
     main.set_layout<GUI::VerticalBoxLayout>();
     main.layout()->set_margins({ 8, 8, 8, 8 });
     main.layout()->set_spacing(8);
-    main.set_fill_with_background_color(true);
 
     auto& header = main.add<GUI::Label>();
     header.set_text("What would you like to do?");
@@ -98,19 +107,26 @@ ShutdownDialog::ShutdownDialog()
 
     auto& button_box = main.add<GUI::Widget>();
     button_box.set_layout<GUI::HorizontalBoxLayout>();
+    button_box.set_size_policy(GUI::SizePolicy::Fill, GUI::SizePolicy::Fixed);
+    button_box.set_preferred_size(0, 20);
     button_box.layout()->set_spacing(8);
+    button_box.layout()->add_spacer();
 
     auto& ok_button = button_box.add<GUI::Button>();
     ok_button.on_click = [this](auto) {
         done(ExecResult::ExecOK);
     };
     ok_button.set_text("OK");
+    ok_button.set_size_policy(GUI::SizePolicy::Fixed, GUI::SizePolicy::Fixed);
+    ok_button.set_preferred_size(80, 20);
 
     auto& cancel_button = button_box.add<GUI::Button>();
     cancel_button.on_click = [this](auto) {
         done(ExecResult::ExecCancel);
     };
     cancel_button.set_text("Cancel");
+    cancel_button.set_size_policy(GUI::SizePolicy::Fixed, GUI::SizePolicy::Fixed);
+    cancel_button.set_preferred_size(80, 20);
 }
 
 ShutdownDialog::~ShutdownDialog()
