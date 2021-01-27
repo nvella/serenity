@@ -24,9 +24,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <AK/Base64.h>
 #include <AK/LexicalPath.h>
 #include <AK/MappedFile.h>
 #include <AK/String.h>
+#include <AK/StringView.h>
 #include <LibCore/ConfigFile.h>
 #include <LibCore/DirIterator.h>
 #include <LibCore/File.h>
@@ -147,6 +149,57 @@ static Optional<Icon> extract_icon_from_elf(NonnullRefPtr<MappedFile> mapped_fil
     return icon;
 }
 
+static Optional<Icon> extract_icon_from_script(NonnullRefPtr<MappedFile> mapped_file, const String&)
+{
+    // Stop now if file is not a shebang script
+    if (mapped_file->size() < 3)
+        return {};
+
+    if (mapped_file->bytes()[0] != '#' || mapped_file->bytes()[1] != '!')
+        return {};
+
+    // Create a StringView to help with further string manipulation
+    auto file_string = StringView(mapped_file->bytes());
+
+    // bool found_icon_medium = false;
+    // bool found_icon_small = false;
+
+    Icon icon;
+
+    // Scan each line of the file for our magic strings
+    for (auto line : file_string.lines()) {
+        // Skip line if not a comment (# or //)
+        if (line[0] != '#' && !(line[0] == '/' && line[1] == '/'))
+            continue;
+        
+        auto maybe_medium_icon_magic_pos = line.find_first_of(SCRIPT_ICON_MAGIC_MEDIUM);
+        auto maybe_small_icon_magic_pos = line.find_first_of(SCRIPT_ICON_MAGIC_SMALL);
+
+        // TODO die if line over SCRIPT_ICON_ENCODED_MAX
+
+        if(maybe_medium_icon_magic_pos.has_value()) {
+            // Medium marker found
+            size_t image_begin_offset = maybe_medium_icon_magic_pos.value() + StringView(SCRIPT_ICON_MAGIC_MEDIUM).length();
+            auto image_buffer = decode_base64(line.substring_view(image_begin_offset));
+
+            RefPtr<Gfx::Bitmap> bitmap = Gfx::load_png_from_memory(image_buffer.data(), image_buffer.size());
+            if(!bitmap) continue;
+            icon.set_bitmap_for_size(32, std::move(bitmap));
+            return icon;
+        } else if(maybe_small_icon_magic_pos.has_value()) {
+            // Small marker found
+            //size_t image_begin_offset = maybe_small_icon_magic_pos.value() + StringView(SCRIPT_ICON_MAGIC_SMALL).length();
+            //auto maybe_icon_buffer = extract_icon_from_line(line.substring_view(image_begin_offset));
+        } else {
+            // No marker found, skip
+            continue;
+        }
+    }
+
+    //if (!found_icon_medium && !found_icon_small)
+        return {};
+}
+
 Icon FileIconProvider::directory_icon()
 {
     initialize_if_needed();
@@ -215,6 +268,14 @@ Icon FileIconProvider::icon_for_executable(const String& path)
     if (icon_from_elf.has_value()) {
         app_icon_cache.set(path, icon_from_elf.value());
         return icon_from_elf.value();
+    }
+
+    // Attempt to extract an icon from the executable, assuming its a script. This will fall through
+    // if the file does not start with a shebang, or valid image data cannot be located.
+    auto icon_from_script = extract_icon_from_script(mapped_file, path);
+    if (icon_from_script.has_value()) {
+        app_icon_cache.set(path, icon_from_script.value());
+        return icon_from_script.value();
     }
 
     app_icon_cache.set(path, s_executable_icon);

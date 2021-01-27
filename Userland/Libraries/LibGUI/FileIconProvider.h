@@ -30,6 +30,10 @@
 #include <LibGUI/Forward.h>
 #include <sys/types.h>
 
+#define SCRIPT_ICON_MAGIC_MEDIUM "$SERENITY_ICON_M$"
+#define SCRIPT_ICON_MAGIC_SMALL "$SERENITY_ICON_S$"
+#define SCRIPT_ICON_ENCODED_MAX 65535
+
 namespace GUI {
 
 class FileIconProvider {
